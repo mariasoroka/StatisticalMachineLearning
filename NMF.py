@@ -35,8 +35,8 @@ class NMF:
         F, N = self.V.shape
 
         # initializing W and H
-        W = np.abs(np.random.randn(F, K) + np.ones(F, K))
-        H = np.abs(np.random.randn(K, N) + np.ones(K, N))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K)))
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N)))
 
         WH = W @ H
 
@@ -44,7 +44,7 @@ class NMF:
             for k in range(K): # SUGGESTION : shuffling range(K)
                 old_w_k = W[:, k]
                 old_h_k = H[k, :]
-                wh = old_w_k @ old_h_k
+                wh = old_w_k[:, np.newaxis] @ old_h_k[np.newaxis, :]
 
                 G_k = wh/WH # Wiener gain
                 V_k = np.power(G_k, 2)*self.V + (1-G_k)*wh # posterior power of C_k
@@ -58,7 +58,7 @@ class NMF:
                 new_w_k = new_w_k/norm_factor
                 new_h_k = new_h_k * norm_factor
 
-                new_wh = new_w_k @ new_h_k
+                new_wh = new_w_k[:, np.newaxis] @ new_h_k[np.newaxis, :]
 
                 # updating W, H and W @ H
                 W[:, k] = new_w_k
@@ -69,7 +69,33 @@ class NMF:
 
     def factorize_EUC(self):
         pass
+
     def factorize_KL(self):
         pass
-    def wiener_reconstruction(self):
-        pass
+
+    def wiener_reconstruction(self, W, H, WH=None):
+        """reconstruct the components when seeing np.sqrt(V) = sum of gaussian components (frame dependent),
+            using V NMF factorization.
+            :param W: W as obtained by factorization
+            :param H: H as obtained by factorization
+            :param WH: W @ H if computed, else it is computed again (optional)
+            :return: list of matrices for every components, corresponding to the contribution in np.sqrt(V) of
+            each component (i.e. np.sqrt(V) = sum of those matrices)
+        """
+        # recomputing W @ H if not provided
+        if WH is None:
+            WH = W @ H
+
+        X = np.sqrt(self.V)
+        F, N = X.shape
+        K = W.shape[1]
+
+        C_matrices = []
+        for k in range(K):
+            C = np.copy(X)/WH
+            C = C * np.tile((W[:, k])[:, np.newaxis], N) * np.tile(H[k, :], (F, 1))
+
+            C_matrices.append(C)
+
+        return C_matrices
+
