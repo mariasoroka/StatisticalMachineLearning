@@ -1,18 +1,72 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import librosa
+from scipy import signal
+from scipy.io import wavfile
 
 class Spectrogram:
-    def __init__(self):
-        pass
+    def __init__(self, frequencies, times, spectrogram):
+        """
+        create Spectrogram instance.
+        """
+        self.frequencies = frequencies
+        self.times = times
+        self.spectrogram = spectrogram
+
     def compute_matrix(self):
+        # should I normalize my self.spectrogram here???
         pass
+
     def visualize(self):
+        """
+        plot the spectrogram.
+        """
+        # matplotlib pcolormesh function is used to plot the spectrogram. As an input it takes
+        # coordinates of the quadrilateral corners of the mesh. Please refer to the matplotlib documentation for details.
+
+        # corners_freq and corners_times store corner values for frequencies and times respectively
+        corners_freq = np.hstack((0, 0.5 * self.frequencies[0:-1:1] + 0.5 * self.frequencies[1::], self.frequencies[-1]))
+        corners_times = np.insert(self.times, 0, 0)
+
+        plot_times, plot_freq = np.meshgrid(corners_times, corners_freq, sparse=False)
+
+        fig = plt.figure(figsize=(7, 7))
+        ax0 = fig.add_subplot(111)
+
+        # using logarithmic scale for amplitudes
+        im = ax0.pcolormesh(plot_times, plot_freq, np.log(self.spectrogram))
+        fig.colorbar(im, ax=ax0)
+        plt.show()
+
+    def restore_recording(self, filename):
+        """
+        restore recording from the spectrogram and export it to .wav file.
+        :param filename: name of .wav file to export recording
+        """
+        # audio_signal = librosa.core.spectrum.griffinlim(self.spectrogram)
+        # print(audio_signal, audio_signal.shape)
+
+        # # write output
+        # fs = 1
+        # wavfile.write(filename, fs, np.array(audio_signal, dtype=np.int16))
         pass
 
 class Recording:
     def __init__(self, filename):
-        pass
+        """
+        create a Recording instance from file.
+        :param filename: name of .wav file with recording
+        """
+        self.sample_rate, self.samples = wavfile.read(filename)
+
     def compute_spectrogram(self):
-        pass
+        """
+        compute a spectrogram for recording and create an instance
+        of Spectrogram class.
+        """
+        frequencies, times, spectrogram = signal.spectrogram(self.samples, self.sample_rate)
+        s = Spectrogram(frequencies, times, spectrogram)
+        return s
 
 class NMF:
     # stores the matrix for factorization
