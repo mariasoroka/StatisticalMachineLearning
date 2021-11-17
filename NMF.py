@@ -43,13 +43,14 @@ class Spectrogram:
         restore recording from the spectrogram and export it to .wav file.
         :param filename: name of .wav file to export recording
         """
-        # audio_signal = librosa.core.spectrum.griffinlim(self.spectrogram)
-        # print(audio_signal, audio_signal.shape)
+        audio_signal = librosa.core.spectrum.griffinlim(self.spectrogram)
+        # the next two lines just retreive sample rate from the Spectrogram fields.
+        # do not know yet what 224 really is
 
-        # # write output
-        # fs = 1
-        # wavfile.write(filename, fs, np.array(audio_signal, dtype=np.int16))
-        pass
+        dt = self.times[1] - self.times[0]
+        sample_rate = int(224 / dt)
+               
+        wavfile.write(filename, sample_rate, np.array(audio_signal, dtype=np.int16))
 
 class Recording:
     def __init__(self, filename):
