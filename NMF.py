@@ -53,12 +53,16 @@ class Spectrogram:
         wavfile.write(filename, sample_rate, np.array(audio_signal, dtype=np.int16))
 
 class Recording:
-    def __init__(self, filename):
+    def __init__(self, filename, n_channels=1, use_first=True):
         """
         create a Recording instance from file.
         :param filename: name of .wav file with recording
         """
-        self.sample_rate, self.samples = wavfile.read(filename)
+        if n_channels == 1:
+            self.sample_rate, self.samples = wavfile.read(filename)
+        else:
+            self.sample_rate, samples = wavfile.read(filename)
+            self.samples = samples[:, 0 if use_first else 1]
 
     def compute_spectrogram(self):
         """
