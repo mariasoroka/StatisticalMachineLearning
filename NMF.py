@@ -77,8 +77,26 @@ class NMF:
         """
         self.V = V
 
-    def factorize_IS(self):
-        pass
+    def factorize_IS(self, K, n_iter):
+        F, N = self.V.shape
+
+        # initializing W and H
+        W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
+        H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
+        
+        for i in range(n_iter):
+            #Update
+            H = H * ( (np.transpose(W) @ (np.power(W@H, -2) * self.V)) * np.power(np.transpose(W) @ np.power(W@H,-1), -1) )
+            
+            W = W * ( ((np.power(W@H,-2) * self.V) @ np.transpose(H)) * np.power(np.power(W@H,-1) @ np.transpose(H), -1) )
+            
+            #Normalization
+            for k in range(K):
+                norm_factor = np.linalg.norm(W[:, k])
+                W[:, k] = W[:, k] / norm_factor
+                H[k, :] = H[k, :] * norm_factor
+            
+        return W, H, W@H
 
     def factorize_EM_IS(self, K, n_iter):
         """factorizes V in W @ H using the IS divergence following the EM algorithm.
@@ -122,12 +140,48 @@ class NMF:
 
         return W, H, WH
 
-    def factorize_EUC(self):
-        pass
+    def factorize_EUC(self, K, n_iter):
+        F, N = self.V.shape
 
-    def factorize_KL(self):
-        pass
+        # initializing W and H
+        W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
+        H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
+        
+        for i in range(n_iter):
+            #Update
+            H = H * ( (np.transpose(W) @ self.V) * np.power(np.transpose(W) @ W@H, -1) )
+            
+            W = W * ( (self.V @ np.transpose(H)) * np.power(W@H @ np.transpose(H), -1) )
+            
+            #Normalization
+            for k in range(K):
+                norm_factor = np.linalg.norm(W[:, k])
+                W[:, k] = W[:, k] / norm_factor
+                H[k, :] = H[k, :] * norm_factor
+                
+        return W, H, W@H
 
+
+    def factorize_KL(self, K, n_iter):
+        F, N = self.V.shape
+
+        # initializing W and H
+        W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
+        H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
+        
+        for i in range(n_iter):
+            H = H * ( (np.transpose(W) @ (np.power(W@H,-1) * self.V)) * np.power( np.transpose(W) @ np.ones((F,N)), -1) )
+            
+            W = W * ( ((np.power(W@H, -1) * self.V) @ np.transpose(H)) * np.power( np.ones((F,N)) @ np.transpose(H), -1) )
+            
+            #Normalization
+            for k in range(K):
+                norm_factor = np.linalg.norm(W[:, k])
+                W[:, k] = W[:, k] / norm_factor
+                H[k, :] = H[k, :] * norm_factor
+            
+        return W, H, W@H
+            
     def wiener_reconstruction(self, W, H, WH=None):
         """reconstruct the components when seeing np.sqrt(V) = sum of gaussian components (frame dependent),
             using V NMF factorization.
