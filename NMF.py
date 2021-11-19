@@ -1,42 +1,41 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import librosa
+import librosa.display
+import soundfile as sf
 from scipy import signal
 from scipy.io import wavfile
 
 class Spectrogram:
-    def __init__(self, frequencies, times, spectrogram):
+    def __init__(self, abs_spectrogram, fs):
         """
         create Spectrogram instance.
         """
-        self.frequencies = frequencies
-        self.times = times
-        self.spectrogram = spectrogram
+        self.spectrogram = abs_spectrogram
+        self.fs = fs
 
     def compute_matrix(self):
-        # should I normalize my self.spectrogram here???
-        pass
-
+        """
+        compute the squared matrix of amplitudes.
+        """
+        return self.spectrogram ** 2
+    
+    def compute_frequencies_times(self):
+        """
+        restore frequencies and times values for spectrogram.
+        """
+        frequencies = librosa.fft_frequencies()
+        times = librosa.frames_to_time(np.arange(np.shape(self.spectrogram)[1]))
+        return frequencies, times
+    
     def visualize(self):
         """
         plot the spectrogram.
         """
-        # matplotlib pcolormesh function is used to plot the spectrogram. As an input it takes
-        # coordinates of the quadrilateral corners of the mesh. Please refer to the matplotlib documentation for details.
-
-        # corners_freq and corners_times store corner values for frequencies and times respectively
-        corners_freq = np.hstack((0, 0.5 * self.frequencies[0:-1:1] + 0.5 * self.frequencies[1::], self.frequencies[-1]))
-        corners_times = np.insert(self.times, 0, 0)
-
-        plot_times, plot_freq = np.meshgrid(corners_times, corners_freq, sparse=False)
-
-        fig = plt.figure(figsize=(7, 7))
-        ax0 = fig.add_subplot(111)
-
-        # using logarithmic scale for amplitudes
-        im = ax0.pcolormesh(plot_times, plot_freq, np.log(self.spectrogram))
-        fig.colorbar(im, ax=ax0)
-        plt.show()
+        fig, ax = plt.subplots()
+        img = librosa.display.specshow(librosa.amplitude_to_db(self.spectrogram, ref=np.max), y_axis='log', x_axis='time', ax=ax)
+        ax.set_title('Power spectrogram')
+        fig.colorbar(img, ax=ax, format="%+2.0f dB")
 
     def restore_recording(self, filename):
         """
@@ -44,33 +43,24 @@ class Spectrogram:
         :param filename: name of .wav file to export recording
         """
         audio_signal = librosa.core.spectrum.griffinlim(self.spectrogram)
-        # the next two lines just retreive sample rate from the Spectrogram fields.
-        # do not know yet what 224 really is
-
-        dt = self.times[1] - self.times[0]
-        sample_rate = int(224 / dt)
-               
-        wavfile.write(filename, sample_rate, np.array(audio_signal, dtype=np.int16))
+        sf.write(filename, audio_signal, self.fs)
 
 class Recording:
-    def __init__(self, filename, n_channels=1, use_first=True):
+    def __init__(self, filename):
         """
         create a Recording instance from file.
         :param filename: name of .wav file with recording
         """
-        if n_channels == 1:
-            self.sample_rate, self.samples = wavfile.read(filename)
-        else:
-            self.sample_rate, samples = wavfile.read(filename)
-            self.samples = samples[:, 0 if use_first else 1]
+        self.sig, self.fs = librosa.core.load(filename, mono=True)
 
     def compute_spectrogram(self):
         """
         compute a spectrogram for recording and create an instance
         of Spectrogram class.
         """
-        frequencies, times, spectrogram = signal.spectrogram(self.samples, self.sample_rate)
-        s = Spectrogram(frequencies, times, spectrogram)
+        abs_spectrogram = np.abs(librosa.core.spectrum.stft(self.sig))
+        s = Spectrogram(abs_spectrogram, self.fs)
+
         return s
 
 class NMF:
