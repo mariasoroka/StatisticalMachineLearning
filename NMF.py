@@ -119,12 +119,7 @@ class NMF:
 
         WH = W @ H
 
-        flag = False
         for i in range(n_iter):
-            if flag:
-                print("END")
-                break
-
             for k in range(K): # SUGGESTION : shuffling range(K)
                 old_w_k = W[:, k]
                 old_h_k = H[k, :]
@@ -135,18 +130,7 @@ class NMF:
 
                 # updating column w_k and row h_k
                 new_h_k = (np.power(old_w_k, -1).T @ V_k) / F
-                new_w_k = (V_k @ np.power(old_h_k, -1).T)/N
-
-                if (new_w_k < 0).any() or (new_h_k < 0).any():
-                    print("HEY")
-                    print(G_k)
-                    print("")
-                    print(V_k)
-                    print("")
-                    print(new_w_k)
-                    print(new_h_k)
-                    flag = True
-                    break
+                new_w_k = (V_k @ np.power(new_h_k, -1).T)/N
 
                 # normalisation (setting l2 norm of w_k to 1)
                 norm_factor = np.linalg.norm(new_w_k)
@@ -207,6 +191,72 @@ class NMF:
             
         return W, H, W@H
             
+
+    def factorize_R_EM_IS(self, K, n_iter, alpha, inverse_gamma=False, threshold=1e-10):
+        """factorizes V in W @ H using the IS divergence with (inverse) Gamma Markov
+            Chain prior to enforce smoothness, following the EM algorithm.
+            :param K: components size, V is a FxN matrix factorized into W and H,
+            FxK and KxN matrices respectively
+            :param n_iter: maximum number of iteration of the algorithm
+            :param alpha: regularization coefficient
+            :param inverse_gamma: use inverse-Gamma Markov Chain (by default false)
+            :param threshold: in order to prevent approximation error that could
+            lead to negative value, under the threshold the update is 0
+            :return: W, H, W @ H, FxK, KxN, FxN matrices s.t. V ~= W @ H
+        """
+        F, N = self.V.shape
+
+        # initializing W and H
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K)))
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N)))
+
+        WH = W @ H
+
+        p_1 = np.repeat(F, N)
+        p_1[0] += 1-alpha if inverse_gamma else 1+alpha
+        p_1[N-1] += 1+alpha if inverse_gamma else 1-alpha
+
+        b_p_2 = np.repeat(alpha + 1, N)
+        b_p_2[N-1 if inverse_gamma else 0] = 0
+
+
+        for i in range(n_iter):
+            for k in range(K):  # SUGGESTION : shuffling range(K)
+                old_w_k = W[:, k]
+                old_h_k = H[k, :]
+                wh = old_w_k[:, np.newaxis] @ old_h_k[np.newaxis, :]
+
+                G_k = wh / WH  # Wiener gain
+                V_k = np.power(G_k, 2) * self.V + (1 - G_k) * wh  # posterior power of C_k
+
+                # updating column w_k and row h_k
+                ML_h_k = (np.power(old_w_k, -1).T @ V_k) / F
+
+                p_2 = b_p_2/np.c_[old_h_k[1:-1], 1] if inverse_gamma else b_p_2/np.c_[1, old_h_k[0:-2]]
+                p_0 = -F*old_h_k
+                p_0 -= (alpha+1)*np.c_[0, old_h_k[0:-2]] if inverse_gamma else (alpha-1)*np.c_[old_h_k[1:-1], 0]
+
+                new_h_k = (np.sqrt(p_1 ** 2 - 4 * p_2 * p_0) - p_1) / (2 * p_2)
+                new_w_k = (V_k @ np.power(new_h_k, -1).T) / N
+
+                # normalisation (setting l2 norm of w_k to 1)
+                norm_factor = np.linalg.norm(new_w_k)
+                new_w_k = new_w_k / norm_factor
+                new_h_k = new_h_k * norm_factor
+
+                new_wh = new_w_k[:, np.newaxis] @ new_h_k[np.newaxis, :]
+
+                # updating W, H and W @ H
+                W[:, k] = new_w_k
+                H[k, :] = new_h_k
+
+                delta = new_wh - wh
+                delta[np.abs(delta) < threshold] = 0
+                WH = WH + delta
+
+        return W, H, WH
+
+
     def wiener_reconstruction(self, W, H, WH=None):
         """reconstruct the components when seeing np.sqrt(V) = sum of gaussian components (frame dependent),
             using V NMF factorization.
