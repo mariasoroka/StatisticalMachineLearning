@@ -102,11 +102,13 @@ class NMF:
             
         return W, H, W@H
 
-    def factorize_EM_IS(self, K, n_iter):
+    def factorize_EM_IS(self, K, n_iter, threshold=1e-10):
         """factorizes V in W @ H using the IS divergence following the EM algorithm.
             :param K: components size, V is a FxN matrix factorized into W and H,
             FxK and KxN matrices respectively
             :param n_iter: maximum number of iteration of the algorithm
+            :param threshold: in order to prevent approximation error that could
+            lead to negative value, under the threshold the update is 0
             :return: W, H, W @ H, FxK, KxN, FxN matrices s.t. V ~= W @ H
         """
         F, N = self.V.shape
@@ -117,7 +119,12 @@ class NMF:
 
         WH = W @ H
 
+        flag = False
         for i in range(n_iter):
+            if flag:
+                print("END")
+                break
+
             for k in range(K): # SUGGESTION : shuffling range(K)
                 old_w_k = W[:, k]
                 old_h_k = H[k, :]
@@ -127,8 +134,19 @@ class NMF:
                 V_k = np.power(G_k, 2)*self.V + (1-G_k)*wh # posterior power of C_k
 
                 # updating column w_k and row h_k
+                new_h_k = (np.power(old_w_k, -1).T @ V_k) / F
                 new_w_k = (V_k @ np.power(old_h_k, -1).T)/N
-                new_h_k = (np.power(old_w_k, -1).T @ V_k)/F
+
+                if (new_w_k < 0).any() or (new_h_k < 0).any():
+                    print("HEY")
+                    print(G_k)
+                    print("")
+                    print(V_k)
+                    print("")
+                    print(new_w_k)
+                    print(new_h_k)
+                    flag = True
+                    break
 
                 # normalisation (setting l2 norm of w_k to 1)
                 norm_factor = np.linalg.norm(new_w_k)
@@ -140,7 +158,10 @@ class NMF:
                 # updating W, H and W @ H
                 W[:, k] = new_w_k
                 H[k, :] = new_h_k
-                WH = WH - wh + new_wh
+
+                delta = new_wh - wh
+                delta[np.abs(delta) < threshold] = 0
+                WH = WH + delta
 
         return W, H, WH
 
