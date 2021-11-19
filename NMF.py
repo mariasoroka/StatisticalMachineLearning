@@ -143,10 +143,10 @@ class NMF:
         
         for i in range(n_iter):
             #Update
-            H = H * ( (np.transpose(W) @ self.V) * np.power(np.transpose(W) @ W@H, -1) )
+            H = H * ( (np.transpose(W) @ self.V) * np.power(np.transpose(W) @ W@H + 1e-09, -1) )
             
-            W = W * ( (self.V @ np.transpose(H)) * np.power(W@H @ np.transpose(H), -1) )
-            
+            W = W * ( (self.V @ np.transpose(H)) * np.power(W@H @ np.transpose(H) + 1e-09, -1) )
+            #1e-09 to avoid division by 0
             #Normalization
             for k in range(K):
                 norm_factor = np.linalg.norm(W[:, k])
