@@ -70,7 +70,18 @@ class NMF:
             :param V: FxN matrix to be factorized
         """
         self.V = V
-
+    
+    def EUC_dis(self, WH):
+        return np.power(np.linalg.norm(self.V - WH),2)
+    
+    def KL_div(self, WH):
+        N = self.V * (np.log(self.V + 1e-09) - np.log(WH +1e-09)) + (WH - self.V)
+        return np.sum(N)
+    
+    def IS_div(self, WH):
+        N = (self.V / (WH + 1e-09))  - (np.log(self.V + 1e-09) - np.log(WH + 1e-09)) -1
+        return np.sum(N)
+    
     def factorize_IS(self, K, n_iter):
         F, N = self.V.shape
 
@@ -78,17 +89,38 @@ class NMF:
         W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
         H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
         
+        WH = W@H
+        WH_1 = np.power(WH,-1)
+        WH_2 = np.power(WH, -2)
         for i in range(n_iter):
-            #Update
-            H = H * ( (np.transpose(W) @ (np.power(W@H, -2) * self.V)) * np.power(np.transpose(W) @ np.power(W@H,-1), -1) )
+            #Update of H component per component
+            for k in range(K):
+                for n in range(N):
+                    # Check if the H_k,n is not to close to 0 to guard from diviion per 0 
+                    if (H[k,n] > 1e-08):
+                        H[k,n] = H[k,n] * ( (np.transpose(W)[k,:] @ (WH_2[:,n] * self.V[:,n]))
+                                           / ( np.transpose(W)[k,:] @ WH_1[:,n] ) )
             
-            W = W * ( ((np.power(W@H,-2) * self.V) @ np.transpose(H)) * np.power(np.power(W@H,-1) @ np.transpose(H), -1) )
+            WH = W@H
+            WH_1 = np.power(WH,-1)
+            WH_2 = np.power(WH, -2)
             
-            #Normalization
+            #Update of W
+            for k in range(K):
+                for f in range(F):
+                    if (W[f,k] > 1e-08):
+                        W[f,k] = W[f,k] * ( ((WH_2[f,:] * self.V[f,:]) @ np.transpose(H)[:,k])
+                                           / ( WH_1[f,:] @ np.transpose(H)[:,k] ) )
+            
+            #Normalisation
             for k in range(K):
                 norm_factor = np.linalg.norm(W[:, k])
                 W[:, k] = W[:, k] / norm_factor
                 H[k, :] = H[k, :] * norm_factor
+                
+            WH = W@H
+            WH_1 = np.power(WH,-1)
+            WH_2 = np.power(WH, -2)
             
         return W, H, W@H
 
@@ -142,8 +174,15 @@ class NMF:
         H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
         
         for i in range(n_iter):
+<<<<<<< HEAD
+            #Updates
+            H = H * ( (np.transpose(W) @ self.V) * np.power(np.transpose(W) @ W@H + 1e-09, -1) )
+            
+            W = W * ( (self.V @ np.transpose(H)) * np.power(W@H @ np.transpose(H) + 1e-09, -1) )
+=======
             #Update
             H = H * ( (np.transpose(W) @ self.V) * np.power(np.transpose(W) @ W@H + 1e-09, -1) )
+>>>>>>> 48322a25cf482ca7076a56793f48b2184e88d95b
             
             W = W * ( (self.V @ np.transpose(H)) * np.power(W@H @ np.transpose(H) + 1e-09, -1) )
             #1e-09 to avoid division by 0
@@ -163,17 +202,36 @@ class NMF:
         W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
         H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
         
+        WH = W@H
+        WH_1 = np.power(WH, -1)
         for i in range(n_iter):
-            H = H * ( (np.transpose(W) @ (np.power(W@H,-1) * self.V)) * np.power( np.transpose(W) @ np.ones((F,N)), -1) )
-            
-            W = W * ( ((np.power(W@H, -1) * self.V) @ np.transpose(H)) * np.power( np.ones((F,N)) @ np.transpose(H), -1) )
-            
-            #Normalization
+            #Update of H
             for k in range(K):
-                norm_factor = np.linalg.norm(W[:, k])
-                W[:, k] = W[:, k] / norm_factor
-                H[k, :] = H[k, :] * norm_factor
+                    for n in range(N):
+                            if (H[k,n] > 1e-08):
+                                H[k,n] = H[k,n] * ( (np.transpose(W)[k,:] @ (WH_1 * self.V)[:,n]) 
+                                               / sum(W[:,k]) )
             
+            WH = W@H
+            WH_1 = np.power(WH, -1)
+            
+            for k in range(K):
+                #Update of W
+                    for f in range(F):
+                        if (W[f,k] > 1e-08):
+                            W[f,k] = W[f,k] * ( ( (WH_1 * self.V)[f,:] @ np.transpose(H)[:,k] ) 
+                                                   / sum(H[k,:]) )       
+            
+            #Normalisation
+            for k in range(K):         
+               norm_factor = np.linalg.norm(W[:, k])
+               W[:, k] = W[:, k] / norm_factor
+               H[k, :] = H[k, :] * norm_factor
+            
+            
+            WH = W@H
+            WH_1 = np.power(WH, -1)
+                        
         return W, H, W@H
             
     def wiener_reconstruction(self, W, H, WH=None):
@@ -201,4 +259,3 @@ class NMF:
             C_matrices.append(C)
 
         return C_matrices
-
