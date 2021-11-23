@@ -8,3 +8,8 @@ test.py
 # PyCharm generated 			#
 # ===================================== #
 .idea/
+
+# ===================================== #
+# Jupyter Notebook generated 		#
+# ===================================== #
+.ipynb_checkpoints/
