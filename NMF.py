@@ -6,6 +6,25 @@ import soundfile as sf
 from scipy import signal
 from scipy.io import wavfile
 
+def get_pitches(W, w_freq):
+    """
+    given matrix W from NMF factorization compute the pitch in MIDI notation and frequency for every column
+    :param W: W matrix from NMF factorization
+    :param w_freq: corresponding frequencies values
+    :return: pitches in MIDI notation, frequency
+    """
+    midi_pitch_set = np.linspace(20.6, 108.4, 440) 
+    freq_set = 440 * np.power(2, (midi_pitch_set - 69) / 12)
+
+    freq_set_bcst = np.tile(freq_set, (np.shape(W)[0], np.shape(W)[1], 1))
+    w_bcst = np.repeat(np.expand_dims(W, axis=2), np.shape(freq_set)[0], axis=2)
+    w_freq_bcst_tmp = np.repeat(np.expand_dims(w_freq, axis=1), np.shape(W)[1], axis=1)
+    w_freq_bcst = np.repeat(np.expand_dims(w_freq_bcst_tmp, axis=2), np.shape(freq_set)[0], axis=2)
+
+    idx = np.argmin(np.sum(w_bcst ** 2 * (1 - np.cos(2 * np.pi * w_freq_bcst / freq_set_bcst)), axis=0), axis=1)
+
+    return [midi_pitch_set[idx], freq_set[idx]]
+
 
 class Spectrogram:
     def __init__(self, abs_spectrogram, fs):
@@ -75,7 +94,22 @@ class NMF:
         """
         self.V = V
         self.costs = []
+<<<<<<< HEAD
        
+=======
+    
+    def EUC_dis(self, WH):
+        return np.power(np.linalg.norm(self.V - WH),2)
+    
+    def KL_div(self, WH):
+        N = self.V * (np.log(self.V + 1e-09) - np.log(WH + 1e-09)) + (WH - self.V)
+        return np.sum(N)
+    
+    def IS_div(self, WH):
+        N = (self.V / (WH + 1e-09))  - (np.log(self.V + 1e-09) - np.log(WH + 1e-09)) -1
+        return np.sum(N)
+    
+>>>>>>> 252e037... pitch decoding
     def factorize_MU_IS(self, K, n_iter):
         """Factorize V ="""
         F, N = self.V.shape
