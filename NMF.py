@@ -75,21 +75,11 @@ class NMF:
         """
         self.V = V
         self.costs = []
-    
-    def EUC_dis(self, WH):
-        return np.power(np.linalg.norm(self.V - WH),2)
-    
-    def KL_div(self, WH):
-        N = self.V * (np.log(self.V + 1e-09) - np.log(WH +1e-09)) + (WH - self.V)
-        return np.sum(N)
-    
-    def IS_div(self, WH):
-        N = (self.V / (WH + 1e-09))  - (np.log(self.V + 1e-09) - np.log(WH + 1e-09)) -1
-        return np.sum(N)
-    
+       
     def factorize_MU_IS(self, K, n_iter):
+        """Factorize V ="""
         F, N = self.V.shape
-
+        
         # initializing W and H
         W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
         H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
@@ -98,43 +88,31 @@ class NMF:
 
         self.costs = []
         self.costs.append(self.cost_divergence(WH, 1))
-
+        
         WH_1 = np.power(WH,-1)
-        WH_2 = np.power(WH, -2)
+        WH_2 = np.power(WH,-2)
+        
         for i in range(n_iter):
-            #Update of H component per component
-            for k in range(K):
-                for n in range(N):
-                    # Check if the H_k,n is not to close to 0 to guard from division per 0
-                    if (H[k,n] > 1e-08):
-                        H[k,n] = H[k,n] * ( (np.transpose(W)[k,:] @ (WH_2[:,n] * self.V[:,n]))
-                                           / ( np.transpose(W)[k,:] @ WH_1[:,n] ) )
-            
-            WH = W@H
-            WH_1 = np.power(WH,-1)
-            WH_2 = np.power(WH, -2)
-            
-            #Update of W
-            for k in range(K):
-                for f in range(F):
-                    if (W[f,k] > 1e-08):
-                        W[f,k] = W[f,k] * ( ((WH_2[f,:] * self.V[f,:]) @ np.transpose(H)[:,k])
-                                           / ( WH_1[f,:] @ np.transpose(H)[:,k] ) )
-            
-            #Normalisation
-            for k in range(K):
-                norm_factor = np.linalg.norm(W[:, k])
-                W[:, k] = W[:, k] / norm_factor
-                H[k, :] = H[k, :] * norm_factor
+            H = H * ( (np.transpose(W) @ (WH_2 * self.V)) / (np.transpose(W) @ WH_1) ) + 1e-09
                 
             WH = W@H
             WH_1 = np.power(WH,-1)
             WH_2 = np.power(WH, -2)
-
+                
+            W = W * ( ((WH_2 * self.V) @ np.transpose(H)) / (WH_1 @ np.transpose(H)) ) + 1e-09
+                
+            for k in range(K):
+                norm_factor = np.linalg.norm(W[:, k])
+                W[:, k] = W[:, k] / norm_factor
+                H[k, :] = H[k, :] * norm_factor
+                    
+            WH = W@H
+            WH_1 = np.power(WH,-1)
+            WH_2 = np.power(WH, -2)
+                
             self.costs.append(self.cost_divergence(WH, 0))
-
         return W, H, WH
-
+        
     def factorize_EM_IS(self, K, n_iter, threshold=1E-10):
         """factorizes V in W @ H using the IS divergence following the EM algorithm.
             :param K: components size, V is a FxN matrix factorized into W and H,
@@ -236,28 +214,18 @@ class NMF:
         WH_1 = np.power(WH, -1)
         for i in range(n_iter):
             #Update of H
-            for k in range(K):
-                    for n in range(N):
-                            if (H[k,n] > 1e-08):
-                                H[k,n] = H[k,n] * ( (np.transpose(W)[k,:] @ (WH_1 * self.V)[:,n]) 
-                                               / sum(W[:,k]) )
+            H = H * ( (np.transpose(W) @ (WH_1 * self.V)) / (np.transpose(W) @ np.ones((F,N))) ) + 1e-09
             
             WH = W@H
             WH_1 = np.power(WH, -1)
             
-            for k in range(K):
-                #Update of W
-                    for f in range(F):
-                        if (W[f,k] > 1e-08):
-                            W[f,k] = W[f,k] * ( ( (WH_1 * self.V)[f,:] @ np.transpose(H)[:,k] ) 
-                                                   / sum(H[k,:]) )       
+            W = W * ( ( (WH_1 * self.V) @ np.transpose(H)) / (np.ones((F,N)) @ np.transpose(H)) ) + 1e-09  
             
             #Normalisation
             for k in range(K):         
                norm_factor = np.linalg.norm(W[:, k])
                W[:, k] = W[:, k] / norm_factor
                H[k, :] = H[k, :] * norm_factor
-            
             
             WH = W@H
             WH_1 = np.power(WH, -1)
@@ -374,9 +342,9 @@ class NMF:
         :return: d_beta(x|y)
         """
         if beta == 0:
-            return x / y - np.log(x / y) - 1
+            return x / (y+1e-09) - (np.log(x+1e-09) - np.log(y+1e-09)) - 1
         elif beta == 1:
-            return x * (np.log(x) - np.log(y)) + y - x
+            return x * (np.log(x+1e-09) - np.log(y + 1e-09)) + y - x
         else:
             return ((x ** beta) + (beta - 1) * (y ** beta) - beta * x * (y ** (beta - 1))) / (beta * (beta - 1))
 
