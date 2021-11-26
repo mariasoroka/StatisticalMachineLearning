@@ -6,6 +6,37 @@ import soundfile as sf
 from scipy import signal
 from scipy.io import wavfile
 
+def get_pitches(W, w_freq):
+    """
+    given matrix W from NMF factorization compute the pitch in MIDI notation and frequency for every column
+    :param W: W matrix from NMF factorization
+    :param w_freq: corresponding frequencies values
+    :return: pitches in MIDI notation, frequency
+    """
+    midi_pitch_set = np.linspace(20.6, 108.4, 440) 
+    freq_set = 440 * np.power(2, (midi_pitch_set - 69) / 12)
+
+    freq_set_bcst = np.tile(freq_set, (np.shape(W)[0], np.shape(W)[1], 1))
+    w_bcst = np.repeat(np.expand_dims(W, axis=2), np.shape(freq_set)[0], axis=2)
+    w_freq_bcst_tmp = np.repeat(np.expand_dims(w_freq, axis=1), np.shape(W)[1], axis=1)
+    w_freq_bcst = np.repeat(np.expand_dims(w_freq_bcst_tmp, axis=2), np.shape(freq_set)[0], axis=2)
+
+    idx = np.argmin(np.sum(w_bcst ** 2 * (1 - np.cos(2 * np.pi * w_freq_bcst / freq_set_bcst)), axis=0), axis=1)
+
+    return [midi_pitch_set[idx], freq_set[idx]]
+
+def plot_freq_times(W, H, spec):
+    
+    K = np.shape(W)[1]
+    freq, times = spec.compute_frequencies_times()
+    pitches = get_pitches(W, freq)[0]
+    fig, axes = plt.subplots(K, 2, figsize=(8 * 2, K * 4))
+    for i in range(K):
+        axes[i, 0].plot(freq, W[:, i])
+        axes[i, 1].plot(times, H[i, :])
+    plt.show()
+    print(pitches)
+
 
 class Spectrogram:
     def __init__(self, abs_spectrogram, fs):
@@ -80,7 +111,7 @@ class NMF:
         return np.power(np.linalg.norm(self.V - WH),2)
     
     def KL_div(self, WH):
-        N = self.V * (np.log(self.V + 1e-09) - np.log(WH +1e-09)) + (WH - self.V)
+        N = self.V * (np.log(self.V + 1e-09) - np.log(WH + 1e-09)) + (WH - self.V)
         return np.sum(N)
     
     def IS_div(self, WH):
@@ -88,8 +119,9 @@ class NMF:
         return np.sum(N)
     
     def factorize_MU_IS(self, K, n_iter):
+        """Factorize V ="""
         F, N = self.V.shape
-
+        
         # initializing W and H
         W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
         H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
@@ -98,43 +130,31 @@ class NMF:
 
         self.costs = []
         self.costs.append(self.cost_divergence(WH, 1))
-
+        
         WH_1 = np.power(WH,-1)
-        WH_2 = np.power(WH, -2)
+        WH_2 = np.power(WH,-2)
+        
         for i in range(n_iter):
-            #Update of H component per component
-            for k in range(K):
-                for n in range(N):
-                    # Check if the H_k,n is not to close to 0 to guard from division per 0
-                    if (H[k,n] > 1e-08):
-                        H[k,n] = H[k,n] * ( (np.transpose(W)[k,:] @ (WH_2[:,n] * self.V[:,n]))
-                                           / ( np.transpose(W)[k,:] @ WH_1[:,n] ) )
-            
-            WH = W@H
-            WH_1 = np.power(WH,-1)
-            WH_2 = np.power(WH, -2)
-            
-            #Update of W
-            for k in range(K):
-                for f in range(F):
-                    if (W[f,k] > 1e-08):
-                        W[f,k] = W[f,k] * ( ((WH_2[f,:] * self.V[f,:]) @ np.transpose(H)[:,k])
-                                           / ( WH_1[f,:] @ np.transpose(H)[:,k] ) )
-            
-            #Normalisation
-            for k in range(K):
-                norm_factor = np.linalg.norm(W[:, k])
-                W[:, k] = W[:, k] / norm_factor
-                H[k, :] = H[k, :] * norm_factor
+            H = H * ( (np.transpose(W) @ (WH_2 * self.V)) / (np.transpose(W) @ WH_1) ) + 1e-09
                 
             WH = W@H
             WH_1 = np.power(WH,-1)
             WH_2 = np.power(WH, -2)
-
+                
+            W = W * ( ((WH_2 * self.V) @ np.transpose(H)) / (WH_1 @ np.transpose(H)) ) + 1e-09
+                
+            for k in range(K):
+                norm_factor = np.linalg.norm(W[:, k])
+                W[:, k] = W[:, k] / norm_factor
+                H[k, :] = H[k, :] * norm_factor
+                    
+            WH = W@H
+            WH_1 = np.power(WH,-1)
+            WH_2 = np.power(WH, -2)
+                
             self.costs.append(self.cost_divergence(WH, 0))
-
         return W, H, WH
-
+        
     def factorize_EM_IS(self, K, n_iter, threshold=1E-10):
         """factorizes V in W @ H using the IS divergence following the EM algorithm.
             :param K: components size, V is a FxN matrix factorized into W and H,
@@ -236,28 +256,18 @@ class NMF:
         WH_1 = np.power(WH, -1)
         for i in range(n_iter):
             #Update of H
-            for k in range(K):
-                    for n in range(N):
-                            if (H[k,n] > 1e-08):
-                                H[k,n] = H[k,n] * ( (np.transpose(W)[k,:] @ (WH_1 * self.V)[:,n]) 
-                                               / sum(W[:,k]) )
+            H = H * ( (np.transpose(W) @ (WH_1 * self.V)) / (np.transpose(W) @ np.ones((F,N))) ) + 1e-09
             
             WH = W@H
             WH_1 = np.power(WH, -1)
             
-            for k in range(K):
-                #Update of W
-                    for f in range(F):
-                        if (W[f,k] > 1e-08):
-                            W[f,k] = W[f,k] * ( ( (WH_1 * self.V)[f,:] @ np.transpose(H)[:,k] ) 
-                                                   / sum(H[k,:]) )       
+            W = W * ( ( (WH_1 * self.V) @ np.transpose(H)) / (np.ones((F,N)) @ np.transpose(H)) ) + 1e-09  
             
             #Normalisation
             for k in range(K):         
                norm_factor = np.linalg.norm(W[:, k])
                W[:, k] = W[:, k] / norm_factor
                H[k, :] = H[k, :] * norm_factor
-            
             
             WH = W@H
             WH_1 = np.power(WH, -1)
@@ -374,9 +384,9 @@ class NMF:
         :return: d_beta(x|y)
         """
         if beta == 0:
-            return x / y - np.log(x / y) - 1
+            return x / (y+1e-09) - (np.log(x+1e-09) - np.log(y+1e-09)) - 1
         elif beta == 1:
-            return x * (np.log(x) - np.log(y)) + y - x
+            return x * (np.log(x+1e-09) - np.log(y + 1e-09)) + y - x
         else:
             return ((x ** beta) + (beta - 1) * (y ** beta) - beta * x * (y ** (beta - 1))) / (beta * (beta - 1))
 
