@@ -25,6 +25,18 @@ def get_pitches(W, w_freq):
 
     return [midi_pitch_set[idx], freq_set[idx]]
 
+def plot_freq_times(W, H, spec):
+    
+    K = np.shape(W)[1]
+    freq, times = spec.compute_frequencies_times()
+    pitches = get_pitches(W, freq)[0]
+    fig, axes = plt.subplots(K, 2, figsize=(8 * 2, K * 4))
+    for i in range(K):
+        axes[i, 0].plot(freq, W[:, i])
+        axes[i, 1].plot(times, H[i, :])
+    plt.show()
+    print(pitches)
+
 
 class Spectrogram:
     def __init__(self, abs_spectrogram, fs):
@@ -94,9 +106,6 @@ class NMF:
         """
         self.V = V
         self.costs = []
-<<<<<<< HEAD
-       
-=======
     
     def EUC_dis(self, WH):
         return np.power(np.linalg.norm(self.V - WH),2)
@@ -109,7 +118,6 @@ class NMF:
         N = (self.V / (WH + 1e-09))  - (np.log(self.V + 1e-09) - np.log(WH + 1e-09)) -1
         return np.sum(N)
     
->>>>>>> 252e037... pitch decoding
     def factorize_MU_IS(self, K, n_iter):
         """Factorize V ="""
         F, N = self.V.shape
