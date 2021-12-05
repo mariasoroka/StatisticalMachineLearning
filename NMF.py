@@ -118,13 +118,13 @@ class NMF:
         N = (self.V / (WH + 1e-09))  - (np.log(self.V + 1e-09) - np.log(WH + 1e-09)) -1
         return np.sum(N)
     
-    def factorize_MU_IS(self, K, n_iter):
+    def factorize_MU_IS(self, K, n_iter, W_0=None, H_0=None):
         """Factorize V ="""
         F, N = self.V.shape
         
         # initializing W and H
-        W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
-        H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
         
         WH = W@H
 
@@ -155,20 +155,22 @@ class NMF:
             self.costs.append(self.cost_divergence(WH, 0))
         return W, H, WH
         
-    def factorize_EM_IS(self, K, n_iter, threshold=1E-10):
+    def factorize_EM_IS(self, K, n_iter, threshold=1E-10, W_0=None, H_0=None):
         """factorizes V in W @ H using the IS divergence following the EM algorithm.
             :param K: components size, V is a FxN matrix factorized into W and H,
             FxK and KxN matrices respectively
             :param n_iter: maximum number of iteration of the algorithm
             :param threshold: in order to prevent approximation error that could
             lead to negative value, under the threshold the update is 0
+            :param W_0: initial value of W (by default randomly generated from ones and a standard gaussian)
+            :param H_0: initial value of H (by default randomly generated from ones and a standard gaussian)
             :return: W, H, W @ H, FxK, KxN, FxN matrices s.t. V ~= W @ H
         """
         F, N = self.V.shape
 
         # initializing W and H
-        W = np.abs(np.random.randn(F, K) + np.ones((F, K)))
-        H = np.abs(np.random.randn(K, N) + np.ones((K, N)))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
 
         WH = W @ H
 
@@ -207,12 +209,12 @@ class NMF:
 
         return W, H, WH
 
-    def factorize_EUC(self, K, n_iter):
+    def factorize_EUC(self, K, n_iter, W_0=None, H_0=None):
         F, N = self.V.shape
 
         # initializing W and H
-        W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
-        H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
 
         WH = W @ H
 
@@ -241,12 +243,12 @@ class NMF:
 
         return W, H, WH
 
-    def factorize_KL(self, K, n_iter):
+    def factorize_KL(self, K, n_iter, W_0=None, H_0=None):
         F, N = self.V.shape
 
         # initializing W and H
-        W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
-        H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
         
         WH = W@H
 
@@ -276,7 +278,7 @@ class NMF:
                         
         return W, H, W@H
 
-    def factorize_R_EM_IS(self, K, n_iter, alpha, inverse_gamma=False, threshold=1E-10):
+    def factorize_R_EM_IS(self, K, n_iter, alpha, inverse_gamma=False, threshold=1E-10, W_0=None, H_0=None):
         """factorizes V in W @ H using the IS divergence with (inverse) Gamma Markov
             Chain prior to enforce smoothness, following the EM algorithm.
             :param K: components size, V is a FxN matrix factorized into W and H,
@@ -286,13 +288,15 @@ class NMF:
             :param inverse_gamma: use inverse-Gamma Markov Chain (by default false)
             :param threshold: in order to prevent approximation error that could
             lead to negative value, under the threshold the update is 0
+            :param W_0: initial value of W (by default randomly generated from ones and a standard gaussian)
+            :param H_0: initial value of H (by default randomly generated from ones and a standard gaussian)
             :return: W, H, W @ H, FxK, KxN, FxN matrices s.t. V ~= W @ H
         """
         F, N = self.V.shape
 
         # initializing W and H
-        W = np.abs(np.random.randn(F, K) + np.ones((F, K)))
-        H = np.abs(np.random.randn(K, N) + np.ones((K, N)))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
 
         WH = W @ H
 
