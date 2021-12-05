@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import librosa
 import librosa.display
 import soundfile as sf
+from sklearn.decomposition import PCA
+from sklearn.decomposition import TruncatedSVD
 from scipy import signal
 from scipy.io import wavfile
 
@@ -369,7 +371,7 @@ class NMF:
 
         C_matrices = []
         for k in range(K):
-            C = np.copy(X) / WH
+            C = np.where(WH>0, np.copy(X) / WH, 0)
             C = C * np.tile((W[:, k])[:, np.newaxis], N) * np.tile(H[k, :], (F, 1))
 
             C_matrices.append(C)
@@ -452,3 +454,36 @@ class NMF:
         ax4.legend()
 
         plt.show()
+        
+def factorize_PCA(V, K, nonnegative = False):
+    """Compute the PCA factorization of V with K number of components.
+    W is the product of the left singular matrix and the diagonal matrix.
+    H is the right singular matrix.
+    nonnegative gives the positive part of W@H so it can be used for audio reconstruction. 
+    """
+    pca = PCA(n_components = K)
+    pca.fit(V)
+    W = pca.fit_transform(V)
+    H = pca.components_
+    WH = W@H
+    if nonnegative:
+        WH = np.where(WH > 0, WH, 0)
+    return W,H,WH
+
+def factorize_TruncatedSVD(V, K, n, nonnegative = False):
+    """Compute the trauncated SVD factorization of V with K number of components.
+    W is the product of the left singular matrix and the diagonal matrix.
+    H is the right singular matrix.
+    n is the number of iteration.
+    nonnegative gives the positive part of W@H so it can be used for audio reconstruction.
+    """
+    svd = TruncatedSVD(K, n_iter = n)
+    svd.fit(V)
+    W = svd.fit_transform(V)
+    H = svd.components_
+    WH = W@H
+    if nonnegative:
+        WH = np.where(WH > 0, WH, 0)
+    return W,H,WH
+
+
