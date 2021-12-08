@@ -194,7 +194,7 @@ class NMF:
 
                 # normalisation (setting l2 norm of w_k to 1)
                 norm_factor = np.linalg.norm(new_w_k)
-                new_w_k = new_w_k / norm_factor
+                new_w_k = new_w_k / (norm_factor + threshold)
                 new_h_k = new_h_k * norm_factor
 
                 new_wh = new_w_k[:, np.newaxis] @ new_h_k[np.newaxis, :]
