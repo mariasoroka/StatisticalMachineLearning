@@ -1,3 +1,4 @@
+from math import cos
 import numpy as np
 import matplotlib.pyplot as plt
 import librosa
@@ -26,16 +27,24 @@ def get_pitches(W, w_freq):
     return [midi_pitch_set[idx], freq_set[idx]]
 
 def plot_freq_times(W, H, spec):
-    
+    """
+    given matrices W and H from NMF factorization builds plots for W columns and H rows in a convenient way.
+    also prints the estimated pitches in MIDI notetion.
+    :param W: W matrix from NMF factorization
+    :param H: H matrix from NMF factorization
+    :param spec: instance of Spectrogram class for which W and H were computed
+    """
     K = np.shape(W)[1]
     freq, times = spec.compute_frequencies_times()
+    mask = freq < 2000
     pitches = get_pitches(W, freq)[0]
+    idx = np.argsort(pitches)
     fig, axes = plt.subplots(K, 2, figsize=(8 * 2, K * 4))
     for i in range(K):
-        axes[i, 0].plot(freq, W[:, i])
-        axes[i, 1].plot(times, H[i, :])
+        axes[i, 0].plot(freq[mask], W[mask, idx[i]])
+        axes[i, 1].plot(times, H[idx[i], :])
     plt.show()
-    print(pitches)
+    print(pitches[idx], idx)
 
 
 class Spectrogram:
@@ -111,11 +120,11 @@ class NMF:
         return np.power(np.linalg.norm(self.V - WH),2)
     
     def KL_div(self, WH):
-        N = self.V * (np.log(self.V + 1e-09) - np.log(WH + 1e-09)) + (WH - self.V)
+        N = (self.V + 1e-09) * np.log((self.V + 1e-09) / (WH + 1e-09)) + (WH - self.V)
         return np.sum(N)
     
     def IS_div(self, WH):
-        N = (self.V / (WH + 1e-09))  - (np.log(self.V + 1e-09) - np.log(WH + 1e-09)) -1
+        N = ((self.V + 1e-09) / (WH + 1e-09))  - np.log((self.V + 1e-09)/(WH + 1e-09)) -1
         return np.sum(N)
     
     def factorize_MU_IS(self, K, n_iter):
@@ -384,9 +393,9 @@ class NMF:
         :return: d_beta(x|y)
         """
         if beta == 0:
-            return x / (y+1e-09) - (np.log(x+1e-09) - np.log(y+1e-09)) - 1
+            return (x + 1e-09) / (y+1e-09) - (np.log(x+1e-09) - np.log(y+1e-09)) - 1
         elif beta == 1:
-            return x * (np.log(x+1e-09) - np.log(y + 1e-09)) + y - x
+            return (x + 1e-09)* (np.log(x+1e-09) - np.log(y + 1e-09)) + y - x
         else:
             return ((x ** beta) + (beta - 1) * (y ** beta) - beta * x * (y ** (beta - 1))) / (beta * (beta - 1))
 
@@ -421,6 +430,7 @@ class NMF:
         :param n_iteration: number of iteration used by algorithms
         :return: None, show plot
         """
+        costs_to_return = []
         fig = plt.figure(figsize=(12, 12))
 
         self.factorize_EUC(K, n_iteration)
@@ -429,6 +439,7 @@ class NMF:
         ax1.set_xlabel('iteration')
         ax1.set_ylabel('cost')
         ax1.legend()
+        costs_to_return.append(self.costs)
 
         self.factorize_KL(K, n_iteration)
         ax2 = fig.add_subplot(222, title='KL')
@@ -436,6 +447,7 @@ class NMF:
         ax2.set_xlabel('iteration')
         ax2.set_ylabel('cost')
         ax2.legend()
+        costs_to_return.append(self.costs)
 
         self.factorize_MU_IS(K, n_iteration)
         ax3 = fig.add_subplot(223, title='IS/MU')
@@ -443,6 +455,7 @@ class NMF:
         ax3.set_xlabel('iteration')
         ax3.set_ylabel('cost')
         ax3.legend()
+        costs_to_return.append(self.costs)
 
         self.factorize_EM_IS(K, n_iteration, threshold=threshold)
         ax4 = fig.add_subplot(224, title='IS/EM')
@@ -450,5 +463,7 @@ class NMF:
         ax4.set_xlabel('iteration')
         ax4.set_ylabel('cost')
         ax4.legend()
+        costs_to_return.append(self.costs)
 
         plt.show()
+        return costs_to_return
