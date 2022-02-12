@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import librosa
 import librosa.display
 import soundfile as sf
+from sklearn.decomposition import PCA
+from sklearn.decomposition import TruncatedSVD
 from scipy import signal
 from scipy.io import wavfile
 
@@ -127,13 +129,13 @@ class NMF:
         N = ((self.V + 1e-09) / (WH + 1e-09))  - np.log((self.V + 1e-09)/(WH + 1e-09)) -1
         return np.sum(N)
     
-    def factorize_MU_IS(self, K, n_iter):
+    def factorize_MU_IS(self, K, n_iter, W_0=None, H_0=None):
         """Factorize V ="""
         F, N = self.V.shape
         
         # initializing W and H
-        W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
-        H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
         
         WH = W@H
 
@@ -164,20 +166,22 @@ class NMF:
             self.costs.append(self.cost_divergence(WH, 0))
         return W, H, WH
         
-    def factorize_EM_IS(self, K, n_iter, threshold=1E-10):
+    def factorize_EM_IS(self, K, n_iter, threshold=1E-10, W_0=None, H_0=None):
         """factorizes V in W @ H using the IS divergence following the EM algorithm.
             :param K: components size, V is a FxN matrix factorized into W and H,
             FxK and KxN matrices respectively
             :param n_iter: maximum number of iteration of the algorithm
             :param threshold: in order to prevent approximation error that could
             lead to negative value, under the threshold the update is 0
+            :param W_0: initial value of W (by default randomly generated from ones and a standard gaussian)
+            :param H_0: initial value of H (by default randomly generated from ones and a standard gaussian)
             :return: W, H, W @ H, FxK, KxN, FxN matrices s.t. V ~= W @ H
         """
         F, N = self.V.shape
 
         # initializing W and H
-        W = np.abs(np.random.randn(F, K) + np.ones((F, K)))
-        H = np.abs(np.random.randn(K, N) + np.ones((K, N)))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
 
         WH = W @ H
 
@@ -199,7 +203,7 @@ class NMF:
 
                 # normalisation (setting l2 norm of w_k to 1)
                 norm_factor = np.linalg.norm(new_w_k)
-                new_w_k = new_w_k / norm_factor
+                new_w_k = new_w_k / (norm_factor + threshold)
                 new_h_k = new_h_k * norm_factor
 
                 new_wh = new_w_k[:, np.newaxis] @ new_h_k[np.newaxis, :]
@@ -216,12 +220,12 @@ class NMF:
 
         return W, H, WH
 
-    def factorize_EUC(self, K, n_iter):
+    def factorize_EUC(self, K, n_iter, W_0=None, H_0=None):
         F, N = self.V.shape
 
         # initializing W and H
-        W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
-        H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
 
         WH = W @ H
 
@@ -250,12 +254,12 @@ class NMF:
 
         return W, H, WH
 
-    def factorize_KL(self, K, n_iter):
+    def factorize_KL(self, K, n_iter, W_0=None, H_0=None):
         F, N = self.V.shape
 
         # initializing W and H
-        W = np.abs(np.random.randn(F, K)) + np.ones((F, K))
-        H = np.abs(np.random.randn(K, N)) + np.ones((K, N))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
         
         WH = W@H
 
@@ -285,7 +289,7 @@ class NMF:
                         
         return W, H, W@H
 
-    def factorize_R_EM_IS(self, K, n_iter, alpha, inverse_gamma=False, threshold=1E-10):
+    def factorize_R_EM_IS(self, K, n_iter, alpha, inverse_gamma=False, threshold=1E-10, W_0=None, H_0=None):
         """factorizes V in W @ H using the IS divergence with (inverse) Gamma Markov
             Chain prior to enforce smoothness, following the EM algorithm.
             :param K: components size, V is a FxN matrix factorized into W and H,
@@ -295,13 +299,15 @@ class NMF:
             :param inverse_gamma: use inverse-Gamma Markov Chain (by default false)
             :param threshold: in order to prevent approximation error that could
             lead to negative value, under the threshold the update is 0
+            :param W_0: initial value of W (by default randomly generated from ones and a standard gaussian)
+            :param H_0: initial value of H (by default randomly generated from ones and a standard gaussian)
             :return: W, H, W @ H, FxK, KxN, FxN matrices s.t. V ~= W @ H
         """
         F, N = self.V.shape
 
         # initializing W and H
-        W = np.abs(np.random.randn(F, K) + np.ones((F, K)))
-        H = np.abs(np.random.randn(K, N) + np.ones((K, N)))
+        W = np.abs(np.random.randn(F, K) + np.ones((F, K))) if W_0 is None else W_0
+        H = np.abs(np.random.randn(K, N) + np.ones((K, N))) if H_0 is None else H_0
 
         WH = W @ H
 
@@ -378,7 +384,7 @@ class NMF:
 
         C_matrices = []
         for k in range(K):
-            C = np.copy(X) / WH
+            C = np.where(WH>0, np.copy(X) / WH, 0)
             C = C * np.tile((W[:, k])[:, np.newaxis], N) * np.tile(H[k, :], (F, 1))
 
             C_matrices.append(C)
@@ -467,3 +473,36 @@ class NMF:
 
         plt.show()
         return costs_to_return
+        
+def factorize_PCA(V, K, nonnegative = False):
+    """Compute the PCA factorization of V with K number of components.
+    W is the product of the left singular matrix and the diagonal matrix.
+    H is the right singular matrix.
+    nonnegative gives the positive part of W@H so it can be used for audio reconstruction. 
+    """
+    pca = PCA(n_components = K)
+    pca.fit(V)
+    W = pca.fit_transform(V)
+    H = pca.components_
+    WH = W@H
+    if nonnegative:
+        WH = np.where(WH > 0, WH, 0)
+    return W,H,WH
+
+def factorize_TruncatedSVD(V, K, n, nonnegative = False):
+    """Compute the trauncated SVD factorization of V with K number of components.
+    W is the product of the left singular matrix and the diagonal matrix.
+    H is the right singular matrix.
+    n is the number of iteration.
+    nonnegative gives the positive part of W@H so it can be used for audio reconstruction.
+    """
+    svd = TruncatedSVD(K, n_iter = n)
+    svd.fit(V)
+    W = svd.fit_transform(V)
+    H = svd.components_
+    WH = W@H
+    if nonnegative:
+        WH = np.where(WH > 0, WH, 0)
+    return W,H,WH
+
+
